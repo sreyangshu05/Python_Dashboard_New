@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  windscope-uk:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: windscope-uk-app
+    ports:
+      - "8000:8000"
+    environment:
+      - ELEXON_BASE_URL=https://data.elexon.co.uk/bmrs/api/v1
+      - EVALUATION_START=2026-01-01
+      - EVALUATION_END=2026-01-31
+      - DEFAULT_DECISION_HOUR_UTC=9
+      - CACHE_TTL_SECONDS=900
+    restart: unless-stopped
