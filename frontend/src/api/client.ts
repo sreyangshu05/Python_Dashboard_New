@@ -1,6 +1,9 @@
 import { AccuracyResponse, ForecastSeriesResponse, OverviewResponse } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+const configuredApiBase = import.meta.env.VITE_API_BASE_URL?.trim();
+const API_BASE = configuredApiBase
+  ? configuredApiBase.replace(/\/+$/, '')
+  : '/api';
 
 export async function fetchOverview(start?: string, end?: string, decisionHour?: number): Promise<OverviewResponse> {
   const params = new URLSearchParams();
@@ -51,4 +54,3 @@ export function getExportUrl(start?: string, end?: string, decisionHour?: number
   if (decisionHour !== undefined) params.append('decision_hour', decisionHour.toString());
   return `${API_BASE}/export.csv?${params.toString()}`;
 }
-

@@ -261,11 +261,15 @@ before launching Uvicorn; Compose currently supplies its configured values in
 | `HOST` | `0.0.0.0` | Uvicorn bind address |
 | `PORT` | `8000` | Application port |
 
-The frontend supports the build-time `VITE_API_BASE_URL` variable. The
-consolidated Docker build uses same-origin
-`/api` and does not need it. `CORS_ORIGINS` supports local or separately
-hosted frontends; no production origin is configured or verified in this
-workspace.
+The frontend supports the build-time `VITE_API_BASE_URL` variable, which is
+the full API base including `/api`. `frontend/.env.production` configures the
+provided Render backend at
+`https://windscope-api-6k4l.onrender.com/api`; Vite embeds this value at build
+time. `frontend/.env.example` documents the setting. Local development leaves
+it unset and uses Vite's `/api` proxy to `http://localhost:8000`. The
+consolidated Docker build uses same-origin `/api` and does not need it.
+`CORS_ORIGINS` on the Render backend must include the exact origin of the
+eventually hosted frontend before browser requests from that domain will work.
 
 Retrieved WINDFOR revisions are stored in SQLite and reused for subsequent
 evaluations, so revisions already captured by the application remain available
@@ -331,6 +335,25 @@ origin (scheme and hostname, without a path), then redeploy. No frontend
 origin or public service URL is prefilled here. Render free web services may
 spin down after inactivity, so the first request after idle time can take
 longer while the service starts.
+
+### Frontend hosting
+
+The frontend production build is configured to call
+`https://windscope-api-6k4l.onrender.com/api`. Deploy the `frontend` directory
+as a static site with `npm ci` followed by `npm run build` as the build command;
+the generated site directory is `dist`. For a static-site host that asks for
+a project/root directory, set it to `frontend`. No frontend
+hosting provider or public frontend URL is configured by this repository.
+
+After the frontend host assigns its URL, add that exact origin (for example,
+`https://your-site.example`, without a path or trailing slash) to
+`CORS_ORIGINS` in the Render backend's environment settings and redeploy the
+backend. Then open the hosted frontend and verify API requests in the browser.
+If the hosting provider has its own environment-variable configuration,
+`VITE_API_BASE_URL` can instead be set there to
+`https://windscope-api-6k4l.onrender.com/api`; because Vite variables are
+compiled into static assets, changing the value requires rebuilding and
+redeploying the frontend.
 
 ### Docker
 
