@@ -7,9 +7,13 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
+from threading import RLock
 from typing import Iterator
 
 from app.services.data_normalization import normalize_timestamp
+
+# SQLite permits one writer at a time; serialize archive connections across request threads.
+_DATABASE_LOCK = RLock()
 
 
 class ForecastRevisionArchive:
@@ -18,23 +22,24 @@ class ForecastRevisionArchive:
     def __init__(self, database_path: str | Path) -> None:
         self.database_path = Path(database_path)
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as connection:
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS forecast_revisions (
-                    start_time TEXT NOT NULL,
-                    publish_time TEXT NOT NULL,
-                    record_json TEXT NOT NULL,
-                    PRIMARY KEY (start_time, publish_time)
+        with _DATABASE_LOCK:
+            with self._connect() as connection:
+                connection.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS forecast_revisions (
+                        start_time TEXT NOT NULL,
+                        publish_time TEXT NOT NULL,
+                        record_json TEXT NOT NULL,
+                        PRIMARY KEY (start_time, publish_time)
+                    )
+                    """
                 )
-                """
-            )
-            connection.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_forecast_revisions_publish_time
-                ON forecast_revisions (publish_time)
-                """
-            )
+                connection.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_forecast_revisions_publish_time
+                    ON forecast_revisions (publish_time)
+                    """
+                )
 
     def store(self, records: list[dict]) -> None:
         """Insert or refresh revisions returned by Elexon."""
@@ -53,31 +58,33 @@ class ForecastRevisionArchive:
                 )
             )
 
-        with self._connect() as connection:
-            connection.executemany(
-                """
-                INSERT INTO forecast_revisions (start_time, publish_time, record_json)
-                VALUES (?, ?, ?)
-                ON CONFLICT (start_time, publish_time)
-                DO UPDATE SET record_json = excluded.record_json
-                """,
-                rows,
-            )
+        with _DATABASE_LOCK:
+            with self._connect() as connection:
+                connection.executemany(
+                    """
+                    INSERT INTO forecast_revisions (start_time, publish_time, record_json)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT (start_time, publish_time)
+                    DO UPDATE SET record_json = excluded.record_json
+                    """,
+                    rows,
+                )
 
     def load(self, publish_from: datetime, publish_to: datetime) -> list[dict]:
         """Load archived revisions in the inclusive UTC publication-time range."""
         start = _canonical_timestamp(publish_from)
         end = _canonical_timestamp(publish_to)
-        with self._connect() as connection:
-            rows = connection.execute(
-                """
-                SELECT record_json
-                FROM forecast_revisions
-                WHERE publish_time >= ? AND publish_time <= ?
-                ORDER BY publish_time, start_time
-                """,
-                (start, end),
-            ).fetchall()
+        with _DATABASE_LOCK:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    """
+                    SELECT record_json
+                    FROM forecast_revisions
+                    WHERE publish_time >= ? AND publish_time <= ?
+                    ORDER BY publish_time, start_time
+                    """,
+                    (start, end),
+                ).fetchall()
         return [json.loads(row[0]) for row in rows]
 
     @contextmanager
