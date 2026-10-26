@@ -58,10 +58,11 @@ The root `render.yaml` defines a backend-only native Python service on
 Render's free plan. It stores the SQLite archive under `/tmp`, which is
 ephemeral and may be cleared on restart, spin-down, or redeploy. This setup
 does not provide durable archive retention. It configures
-`CORS_ORIGINS=https://windscope-blond.vercel.app`. The running service must
-receive the updated Blueprint/environment setting and redeploy before that
-origin is allowed; a live preflight was rejected before this configuration
-change.
+`CORS_ORIGINS` for `https://python-dashboard-new.vercel.app` and the
+previously shared `https://windscope-blond.vercel.app`. The running service
+must receive the updated Blueprint/environment setting and redeploy before
+the current origin is allowed; a live preflight was rejected before this
+configuration change.
 
 `docker compose config --quiet` validates the Compose configuration. Docker
 image build/start was not run because the local Docker daemon was unavailable.

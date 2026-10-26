@@ -325,19 +325,22 @@ captured again after the archive is lost. This free configuration is suitable
 for a demo, not durable historical retention.
 
 The Blueprint sets `CORS_ORIGINS` to the current Vercel frontend origin,
-`https://windscope-blond.vercel.app`. If the Vercel domain changes, update
-this value in Render's service environment (or update and sync the Blueprint)
-to the exact deployed frontend origin, then redeploy the backend.
+`https://python-dashboard-new.vercel.app`, and retains the previously shared
+`https://windscope-blond.vercel.app` origin. If the Vercel domain changes,
+update this value in Render's service environment (or update and sync the
+Blueprint) to include the exact deployed frontend origin, then redeploy the
+backend.
 
 To deploy, push this repository to GitHub, create a new Render Blueprint using
 that repository, review the proposed service and disk, and apply it. After
 deployment, verify `/api/health` and `/api/docs` at the Render-provided service
 URL. The configured backend is currently reachable at
 `https://windscope-api-6k4l.onrender.com`; health and overview requests have
-returned HTTP 200. A browser preflight from the Vercel origin was rejected
-before the new `CORS_ORIGINS` setting was applied to the live service. Sync
-this Blueprint or set the same `CORS_ORIGINS` value in Render's Environment
-settings and redeploy. This backend-only deployment does not host the
+returned HTTP 200. The latest preflight from
+`https://python-dashboard-new.vercel.app` returned HTTP 400, confirming that
+the live CORS allowlist has not yet been updated. Sync this Blueprint or set
+`CORS_ORIGINS` in Render's Environment settings to include both configured
+Vercel origins, then redeploy. This backend-only deployment does not host the
 frontend. Render free web services may spin down after inactivity, so the
 first request after idle time can take longer while the service starts.
 
@@ -347,15 +350,16 @@ The frontend production build is configured to call
 `https://windscope-api-6k4l.onrender.com/api`. Deploy the `frontend` directory
 as a static site with `npm ci` followed by `npm run build` as the build command;
 the generated site directory is `dist`. For a static-site host that asks for
-a project/root directory, set it to `frontend`. The Vercel frontend URL used
-for CORS configuration is `https://windscope-blond.vercel.app`.
+a project/root directory, set it to `frontend`. The current Vercel frontend
+URL is `https://python-dashboard-new.vercel.app`.
 
-The configured frontend origin is `https://windscope-blond.vercel.app`. If
-Vercel assigns a different production domain, update `CORS_ORIGINS` in the
-Render backend's environment settings to that exact origin (without a path or
-trailing slash) and redeploy the backend. Then open the hosted frontend and
-verify API requests in the browser. The current CORS error indicates that the
-updated allowlist is not yet active on the running Render service.
+The configured frontend origin is `https://python-dashboard-new.vercel.app`.
+If Vercel assigns a different production domain, update `CORS_ORIGINS` in the
+Render backend's environment settings to include that exact origin (without a
+path or trailing slash) and redeploy the backend. Then open the hosted
+frontend and verify API requests in the browser. The current CORS error
+indicates that the updated allowlist is not yet active on the running Render
+service.
 If the hosting provider has its own environment-variable configuration,
 `VITE_API_BASE_URL` can instead be set there to
 `https://windscope-api-6k4l.onrender.com/api`; because Vite variables are
