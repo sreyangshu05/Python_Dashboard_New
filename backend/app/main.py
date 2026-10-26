@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -68,16 +67,6 @@ def root():
 
 if dist_dir:
     logging.info("Serving frontend static assets from %s", dist_dir)
-    app.mount("/assets", StaticFiles(directory=dist_dir / "assets"), name="assets")
-
-    @app.get("/{full_path:path}")
-    def serve_frontend(full_path: str):
-        # Don't intercept API routes
-        if full_path.startswith("api"):
-            return None
-        file_path = dist_dir / full_path
-        if file_path.exists() and file_path.is_file():
-            return FileResponse(file_path)
-        return FileResponse(dist_dir / "index.html")
+    app.mount("/", StaticFiles(directory=dist_dir, html=True), name="frontend")
 else:
     app.add_api_route("/", root, methods=["GET"])

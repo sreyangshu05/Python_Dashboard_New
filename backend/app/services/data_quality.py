@@ -38,9 +38,12 @@ def compute_data_quality(
     quality.periods_missing_forecast = sum(
         1 for r in records if not r.forecast_available
     )
+    records_by_target = {record.target_time: record for record in records}
     quality.forecasts_excluded_after_cutoff = sum(
-        1 for r in records
-        if not r.forecast_available and r.exclusion_reason and "after decision time" in r.exclusion_reason
+        1
+        for row in forecasts_df.itertuples()
+        if row.start_time in records_by_target
+        and row.publish_time > records_by_target[row.start_time].decision_time
     )
 
     if records:
@@ -49,4 +52,3 @@ def compute_data_quality(
         quality.last_target_time = max(target_times)
 
     return quality
-

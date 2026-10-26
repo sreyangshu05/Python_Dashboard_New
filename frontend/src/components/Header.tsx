@@ -29,7 +29,8 @@ export const Header: React.FC<HeaderProps> = ({
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
-      }) + ' GMT';
+        timeZoneName: 'short',
+      });
     } catch {
       return ts;
     }
@@ -38,8 +39,8 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <div className="flex items-center space-x-3">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center min-h-16 py-3 gap-3">
+          <div className="flex items-center space-x-3 min-w-0">
             <div className="w-10 h-10 rounded-lg bg-teal-600 flex items-center justify-center text-white shadow-xs">
               <Wind className="w-6 h-6" />
             </div>
@@ -54,7 +55,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end space-x-4">
             <div className="hidden md:flex flex-col text-right text-xs">
               <div className="flex items-center justify-end space-x-1.5 text-slate-600">
                 <Clock className="w-3.5 h-3.5 text-slate-400" />
@@ -72,7 +73,7 @@ export const Header: React.FC<HeaderProps> = ({
                 {dataSourceStatus === 'connected' && (
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                     <span className="w-1.5 h-1.5 mr-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Elexon BMRS Live
+                    Elexon BMRS Connected
                   </span>
                 )}
                 {dataSourceStatus === 'loading' && (

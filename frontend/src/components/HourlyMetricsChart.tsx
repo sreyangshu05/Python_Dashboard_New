@@ -64,7 +64,12 @@ export const HourlyMetricsChart: React.FC<HourlyMetricsChartProps> = ({ hourlyMe
             No diurnal metrics available.
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            role="img"
+            aria-label="Bar chart of mean absolute error and mean bias error by UTC hour, measured in megawatts."
+          >
             <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="hour" tick={{ fontSize: 10, fill: '#64748b' }} stroke="#cbd5e1" />
@@ -72,8 +77,8 @@ export const HourlyMetricsChart: React.FC<HourlyMetricsChartProps> = ({ hourlyMe
               <Tooltip content={<CustomTooltip />} />
               <Legend verticalAlign="top" height={32} wrapperStyle={{ fontSize: '11px' }} />
               <ReferenceLine y={0} stroke="#94a3b8" />
-              <Bar dataKey="mae" name="Mean Abs Error (MW)" fill="#0d9488" radius={[2, 2, 0, 0]} opacity={0.85} />
-              <Bar dataKey="mbe" name="Mean Bias (MW)" fill="#f59e0b" radius={[2, 2, 0, 0]} opacity={0.85} />
+              <Bar dataKey="mae" name="Mean Abs Error (MW)" fill="#0d9488" radius={[2, 2, 0, 0]} opacity={0.85} isAnimationActive={false} />
+              <Bar dataKey="mbe" name="Mean Bias (MW)" fill="#f59e0b" radius={[2, 2, 0, 0]} opacity={0.85} isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
         )}

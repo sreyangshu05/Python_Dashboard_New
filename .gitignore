@@ -44,3 +44,4 @@ Thumbs.db
 # Scratch & Logs
 scratch/
 *.log
+backend/data/

@@ -20,8 +20,16 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({ records, isLoading
   // Format data for chart
   const data = records.map((r) => {
     const dt = new Date(r.target_time);
-    const dateStr = dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-    const timeStr = dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = dt.toLocaleDateString('en-GB', {
+      timeZone: 'UTC',
+      day: 'numeric',
+      month: 'short',
+    });
+    const timeStr = dt.toLocaleTimeString('en-GB', {
+      timeZone: 'UTC',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
     return {
       targetTime: r.target_time,
       displayTime: `${dateStr} ${timeStr}`,
@@ -40,7 +48,7 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({ records, isLoading
       return (
         <div className="bg-slate-900 text-white p-3 rounded-lg shadow-lg text-xs space-y-1.5 border border-slate-700 max-w-xs">
           <p className="font-semibold text-slate-200 border-b border-slate-800 pb-1">
-            Target: {p.displayTime} GMT
+            Target: {p.displayTime} UTC
           </p>
           <div className="flex justify-between items-center text-teal-300">
             <span>Forecast:</span>
@@ -104,7 +112,12 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({ records, isLoading
             No matched observation series for the selected filters.
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            role="img"
+            aria-label="Line chart comparing hourly day-ahead wind forecasts with realized generation in megawatts. Detailed values are available in Forecast Explorer."
+          >
             <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis
@@ -132,6 +145,7 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({ records, isLoading
                 stroke="#0d9488"
                 strokeWidth={2}
                 dot={false}
+                isAnimationActive={false}
                 activeDot={{ r: 4, stroke: '#0f766e', strokeWidth: 1 }}
               />
               <Line
@@ -141,6 +155,7 @@ export const ForecastChart: React.FC<ForecastChartProps> = ({ records, isLoading
                 stroke="#2563eb"
                 strokeWidth={2}
                 dot={false}
+                isAnimationActive={false}
                 activeDot={{ r: 4, stroke: '#1d4ed8', strokeWidth: 1 }}
               />
             </LineChart>

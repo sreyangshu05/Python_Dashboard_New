@@ -1,21 +1,19 @@
 # WindScope UK — Client Presentation & Demonstration Deck
 
-**UK Day-Ahead Wind Forecast Intelligence & Procurement Decision Support Platform**  
-*Audience: Electricity Procurement Lead, Wholesale Trading Analyst, Risk Manager*  
+**UK Wind Forecast Review Dashboard**
+
+*Audience: Electricity Procurement and Analytics Teams*
 *Duration: 5–7 Minutes Pitch & Interactive Demonstration*
 
 ---
 
 ## Slide 1 — The Business Challenge
 
-### Balancing Renewable Variability in the Day-Ahead Wholesale Electricity Market
+### Reviewing Wind Forecasts for Day-Ahead Analysis
 
-* **The Mandate:** The procurement desk must secure sufficient wholesale electricity volume day-ahead to meet consumer demand at lowest risk and lowest cost.
-* **The Intermittent Reality:** While wind power provides zero-marginal-cost renewable energy, UK national wind output fluctuates by thousands of megawatts across hours.
-* **The Core Dilemma:**
-  1. *Under-procurement risk:* If wind generation falls short of expectations, the utility faces expensive System Buy Prices (cash-out penalties) or must dispatch peaking plants at volatile intraday prices.
-  2. *Over-procurement risk:* If wind generates more than forecasted, the surplus energy may have to be spilled or sold back into the balancing mechanism at a loss (or even negative prices).
-* **The Key Need:** Procurement decisions require transparent visibility into **what forecasts were actually published before the procurement window closed**, and a **quantitative understanding of historical forecast errors and systematic bias**.
+* Wind generation is variable, and forecast error can be relevant to operational and commercial analysis.
+* A retrospective comparison is useful only when its selection rule, data quality, and limitations are visible.
+* WindScope provides a reproducible view of returned forecast publications and measured differences from realized generation. It does not estimate market exposure or recommend a procurement position.
 
 ---
 
@@ -23,37 +21,36 @@
 
 ### "See the latest available wind forecast. Measure its accuracy. Make better-informed procurement decisions."
 
-WindScope UK is an enterprise-grade forecast intelligence and decision-support web application tailored for UK day-ahead power buyers.
+WindScope UK is a forecast-intelligence and decision-support web application for UK day-ahead power buyers.
 
-### Dual Core Capabilities:
-1. **Decision-Time Forecast Visibility:** 
-   * Reconstructs the exact forecast state available to the analyst at any specified historical procurement cutoff (e.g., 09:00 UTC day-ahead).
-   * Guaranteed zero future information leakage: strictly quarantines revisions broadcast after the decision cutoff.
-2. **Quantitative Accuracy & Uncertainty Analytics:**
+### Core Capabilities
+1. **Decision-Time Forecast Visibility:**
+   * Selects the newest forecast revision returned by Elexon or captured in the local archive at or before the configured cutoff (default: 09:00 UTC on the preceding day).
+   * Excludes known revisions published after that cutoff. Completeness of historical source records is not guaranteed.
+2. **Quantitative Error Analytics:**
    * Calculates Mean Absolute Error (MAE), Root Mean Squared Error (RMSE), Mean Absolute Percentage Error (MAPE), and Mean Bias Error (MBE).
-   * Uncovers systematic over- or under-forecasting tendencies and diurnal patterns across settlement periods.
+   * Summarizes errors and bias in the matched observations available for the selected period.
 
 ---
 
 ## Slide 3 — Product Demonstration (Live Walkthrough)
 
-*Presenter Action: Switch to browser view at `http://localhost:8000` (or deployed URL)*
+*Presenter Action: Start the local application using the README instructions, then open `http://localhost:8000`. This is a local address, not a public deployment URL.*
 
 ### Walkthrough Narrative:
 1. **Global Header & Health Status:**
-   * Notice the live data connector badge: directly connected to Elexon BMRS streaming endpoints (`FUELHH` and `WINDFOR`).
+   * The dashboard requests Elexon BMRS `FUELHH` and `WINDFOR` data when loaded or refreshed.
    * Displays the active evaluation scope (**January 2026**) and the active day-ahead decision cutoff (**09:00 UTC**).
 2. **Executive KPI Strip:**
-   * **Latest Forecast vs Latest Realized Generation:** Instant insight into the most recent matched settlement period.
-   * **Monthly MAE:** Highlights the average magnitude of volumetric forecast discrepancy across the portfolio.
-   * **Monthly RMSE:** Highlights the dispersion penalty for extreme forecast misses.
-   * **Mean Bias Error (MBE):** Instantly alerts the procurement desk whether the national model had a structural tendency to over- or under-predict wind.
+   * **Latest Forecast vs Latest Realized Generation:** Shows the most recent matched observation in the selected response.
+   * **MAE and RMSE:** Summarize absolute error for the matched observations in the selected period.
+   * **Mean Bias Error (MBE):** Positive values indicate overforecasting on average; negative values indicate underforecasting.
 3. **Interactive Forecast vs Actual Chart:**
    * Dual-trace visualization tracking national wind output in megawatts across January 2026.
-   * Hover tooltips display the target settlement hour, forecasted MW, actual realized MW, forecast error, and the exact publication timestamp.
+   * Hover tooltips show the available target, forecast, actual, error, and publication details.
 4. **Signed Error Over Time:**
    * Color-coded bars (amber for overforecasts, blue for underforecasts) relative to the zero-reference axis.
-   * Demonstrates whether errors were sustained multi-day weather front mispredictions or isolated ramp errors.
+   * Displays signed error over time; it does not attribute errors to weather events or forecast causes.
 
 ---
 
@@ -63,37 +60,34 @@ WindScope UK is an enterprise-grade forecast intelligence and decision-support w
 
 | Metric | Formulation | Unit | Procurement Desk Interpretation |
 | :--- | :--- | :--- | :--- |
-| **Signed Error** | $e_i = \text{Forecast}_i - \text{Actual}_i$ | MW | Positive = Overforecast (surplus); Negative = Underforecast (deficit risk). |
-| **MAE** | $\frac{1}{N}\sum \|e_i\|$ | MW | Mean volumetric discrepancy magnitude. Essential for sizing reserve margin. |
-| **RMSE** | $\sqrt{\frac{1}{N}\sum e_i^2}$ | MW | Heavily penalizes large swings. Reflects extreme physical balancing risk. |
-| **MBE (Bias)** | $\frac{1}{N}\sum e_i$ | MW | Detects structural model optimism or conservatism. |
-| **MAPE** | $\frac{1}{N_{\text{nonzero}}}\sum \frac{\|e_i\|}{\text{Actual}_i} \times 100\%$ | % | Normalized relative error. **Zero-actual hours strictly isolated** to prevent division-by-zero distortion. |
+| **Signed Error** | $e_i = \text{Forecast}_i - \text{Actual}_i$ | MW | Positive = overforecast; negative = underforecast. |
+| **MAE** | $\frac{1}{N}\sum \|e_i\|$ | MW | Mean absolute error over finite matched pairs. |
+| **RMSE** | $\sqrt{\frac{1}{N}\sum e_i^2}$ | MW | Gives larger errors greater weight; not a direct balancing-risk measure. |
+| **MBE (Bias)** | $\frac{1}{N}\sum e_i$ | MW | Summarizes average signed error across the matched pairs. |
+| **MAPE** | $\frac{1}{N_{\text{nonzero}}}\sum \frac{\|e_i\|}{|\text{Actual}_i|} \times 100\%$ | % | Mean absolute percentage error; zero actuals are excluded from its denominator. |
 
 ---
 
-## Slide 5 — Trust, Provenance & Data Governance
+## Slide 5 — Data Handling & Limitations
 
-### Why Procurement Leads Can Trust WindScope UK
+### What the dashboard does and does not establish
 
 * **Strict Elexon Data Scope:** Consumes only official Elexon BMRS datasets: `FUELHH` (fuelType = "WIND") and `WINDFOR`. No unverified third-party scraping or black-box weather inputs.
 * **Resolution Alignment:** Harmonizes 30-minute settlement actuals into 60-minute blocks matching the hourly forecast horizon.
-* **Auditability & Provenance Panel:**
-  * Tracks total records ingested, duplicate actuals removed, and exact timestamp boundaries.
-  * Explicitly counts and logs how many forecasts were excluded because they arrived after the procurement cutoff.
-* **Zero Fabrication Guarantee:** Missing forecasts or actuals are represented explicitly as unavailable — never silently filled with zeros or synthetic estimates.
-* **One-Click Audit Export:** Full dataset exportable to CSV with verified UTC timestamps for regulatory compliance and quantitative modeling.
+* Missing forecasts and actuals are represented as unavailable; incomplete FUELHH hour pairs are not filled with zero.
+* CSV export follows the active evaluation filters and uses UTC timestamps.
+* SQLite retains successfully retrieved WINDFOR revisions from first capture onward; it cannot recover earlier revisions that were already absent from Elexon's response.
+* Every evaluation still needs successful upstream Elexon requests. The archive is not a complete offline data source.
 
 ---
 
-## Slide 6 — Business Value & Procurement ROI
+## Slide 6 — Appropriate Use
 
-### Turning Forecast Intelligence into Commercial Advantage
+### A retrospective analytical aid, not a financial forecast
 
-* **Calibrated Day-Ahead Sizing:** Sizing day-ahead bilateral purchases against wind forecasts adjusted for known historical bias (MBE) prevents costly systematic imbalance.
-* **Stress-Tested Buffer Margins:** Using empirical RMSE and MAE distributions to establish dynamic risk buffers rather than arbitrary rule-of-thumb safety margins.
-* **Ramp & Peak Hour Protection:** The Diurnal Pattern chart reveals whether errors spike during morning demand ramps (07:00–09:00) or evening peaks (17:00–19:00).
-* **Defensible Stakeholder Reporting:** Clear, unmanipulated metrics for executive risk committees and regulatory audits.
-* *Governance Note:* WindScope UK is a forecast decision-support platform, not an algorithmic trading engine. Forecast errors do not directly equal cash-out imbalance costs.
+* Compare observed forecast error across the selected dates and available matched hours.
+* Use bias and error summaries as inputs to further analysis, with suitable review and controls.
+* Do not translate these metrics directly into reserve sizing, savings, cash-out cost, or procurement ROI. The dashboard does not include demand, contracts, market prices, or a validated cost model.
 
 ---
 
@@ -110,8 +104,8 @@ WindScope UK is an enterprise-grade forecast intelligence and decision-support w
 
 ## Presenter Script & Suggested Demonstration Flow (6 Minutes)
 
-* **[0:00 - 1:00] Intro & Problem Statement:** "Good morning. When procurement teams commit millions of pounds in the day-ahead power market, their exposure hinges on renewable forecasts. If wind underperforms, cash-out penalties bite. If wind overperforms, surplus power is dumped. WindScope UK answers two vital questions: What forecast was actually on your screen when you made the call, and how accurate was it?"
-* **[1:00 - 2:30] Live Demo - Overview:** "Looking at January 2026 on our live dashboard, our system connects directly to Elexon BMRS. At our default 09:00 UTC day-ahead cutoff, we observe a monthly MAE of X MW, and our MBE shows whether the national forecast was structurally optimistic or conservative. On the main chart, you can clearly see the hourly forecast vs actual realization."
-* **[2:30 - 3:45] Forecast Explorer & Cutoff Testing:** "Let's switch to the Forecast Explorer. If our trading policy shifted cutoff from 09:00 to 11:00 UTC, we can immediately re-evaluate the historical backtest. Notice the availability status badges: we never leak future revisions into past decisions."
-* **[3:45 - 4:45] Accuracy Analytics & Diurnal Patterns:** "In the Accuracy Analysis tab, we see the error distribution histogram and the hourly diurnal pattern, revealing whether error spikes align with national peak demand hours."
-* **[4:45 - 6:00] Conclusion & Q&A:** "WindScope UK provides defensible, audited, and mathematically sound forecast intelligence. We welcome your questions."
+* **[0:00 - 1:00] Context:** "WindScope compares returned UK wind forecasts with later realized generation and makes the historical selection rule and data limitations visible."
+* **[1:00 - 2:30] Overview:** "The dashboard requests January 2026 Elexon data and applies the configured prior-day 09:00 UTC cutoff. Interpret displayed metrics for the matched observations in the selected response."
+* **[2:30 - 3:45] Forecast Explorer:** "Explore availability, dates, cutoff, and exported records. The selector excludes known post-cutoff revisions, but cannot prove that the source returned every historical revision."
+* **[3:45 - 4:45] Accuracy Analytics:** "Review the error distribution and hourly summaries. These describe the observed data; they do not establish financial impact or causation."
+* **[4:45 - 6:00] Conclusion:** "WindScope is an analytical aid for reviewing wind forecast performance, not a trading or cost-optimization system."

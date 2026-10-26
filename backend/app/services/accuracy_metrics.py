@@ -44,15 +44,20 @@ def calculate_accuracy_metrics(
 
     # Extract valid pairs (both forecast and actual are available and finite)
     valid_pairs: list[tuple[float, float]] = []
+    excluded_missing_forecast = 0
+    excluded_missing_actual = 0
+    excluded_non_finite = 0
     for r in records:
-        if (
-            r.forecast_available
-            and r.actual_available
-            and r.forecast_generation_mw is not None
-            and r.actual_generation_mw is not None
-            and math.isfinite(r.forecast_generation_mw)
+        if not r.forecast_available or r.forecast_generation_mw is None:
+            excluded_missing_forecast += 1
+        elif not r.actual_available or r.actual_generation_mw is None:
+            excluded_missing_actual += 1
+        elif not (
+            math.isfinite(r.forecast_generation_mw)
             and math.isfinite(r.actual_generation_mw)
         ):
+            excluded_non_finite += 1
+        else:
             valid_pairs.append((r.forecast_generation_mw, r.actual_generation_mw))
 
     total_observations = len(records)
@@ -68,6 +73,9 @@ def calculate_accuracy_metrics(
             error_std_mw=None,
             total_observations=total_observations,
             valid_observations=0,
+            excluded_missing_forecast=excluded_missing_forecast,
+            excluded_missing_actual=excluded_missing_actual,
+            excluded_non_finite=excluded_non_finite,
             mape_eligible_observations=0,
             mape_excluded_zero_actual=0,
             evaluation_start=datetime.fromisoformat(evaluation_start).replace(tzinfo=timezone.utc),
@@ -115,6 +123,9 @@ def calculate_accuracy_metrics(
         error_std_mw=round(error_std, 2) if error_std is not None else None,
         total_observations=total_observations,
         valid_observations=valid_count,
+        excluded_missing_forecast=excluded_missing_forecast,
+        excluded_missing_actual=excluded_missing_actual,
+        excluded_non_finite=excluded_non_finite,
         mape_eligible_observations=mape_eligible,
         mape_excluded_zero_actual=mape_excluded,
         evaluation_start=datetime.fromisoformat(evaluation_start).replace(tzinfo=timezone.utc),
@@ -229,4 +240,3 @@ def calculate_error_distribution(records: list[SelectedForecast]) -> list[dict]:
             "count": int(counts[i]),
         })
     return result
-

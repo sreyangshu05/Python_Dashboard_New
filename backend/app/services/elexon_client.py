@@ -135,11 +135,11 @@ class ElexonClient:
         publish_from: datetime,
         publish_to: datetime,
     ) -> list[dict]:
-        """Fetch wind generation forecasts (WINDFOR) by publication time.
+        """Fetch WINDFOR records published within the requested time window.
 
-        Using publishDateTimeFrom/To preserves all historical forecast revisions,
-        which is essential for reconstructing what was available at a historical
-        decision time.
+        The publication-time query retrieves revisions returned by Elexon for
+        this interval; the source's historical retention completeness is not
+        guaranteed by this client.
 
         Args:
             publish_from: Start of publishDateTime range (UTC).
@@ -153,4 +153,3 @@ class ElexonClient:
             "publishDateTimeTo": publish_to.strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
         return self._make_request("datasets/WINDFOR/stream", params)
-

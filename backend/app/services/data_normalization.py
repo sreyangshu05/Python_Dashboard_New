@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import pandas as pd
+import numpy as np
 
 from app.schemas.models import DataQualityStats
 
@@ -72,11 +73,15 @@ def normalize_actuals(raw_records: list[dict], quality: DataQualityStats) -> pd.
     # Filter to WIND only (should already be filtered, but defensive)
     df = df[df["fuelType"] == "WIND"].copy()
 
-    # Drop records with null generation
-    null_count = df["generation"].isna().sum()
-    if null_count > 0:
-        logger.warning("Dropping %d FUELHH records with null generation", null_count)
-    df = df.dropna(subset=["generation"])
+    df["generation"] = pd.to_numeric(df["generation"], errors="coerce")
+    finite_mask = np.isfinite(df["generation"].to_numpy(dtype=float))
+    quality.invalid_actual_records = int((~finite_mask).sum())
+    if quality.invalid_actual_records:
+        logger.warning(
+            "Dropping %d FUELHH records with invalid generation",
+            quality.invalid_actual_records,
+        )
+    df = df.loc[finite_mask].copy()
 
     # Deduplicate: keep the latest publishTime for each startTime
     original_count = len(df)
@@ -98,6 +103,8 @@ def normalize_actuals(raw_records: list[dict], quality: DataQualityStats) -> pd.
         )
         .reset_index()
     )
+    quality.incomplete_actual_hours = int((hourly["sp_count"] != 2).sum())
+    hourly = hourly[hourly["sp_count"] == 2].copy()
 
     logger.info(
         "Normalized %d half-hourly actuals into %d hourly periods",
@@ -127,17 +134,27 @@ def normalize_forecasts(raw_records: list[dict], quality: DataQualityStats) -> p
     df["startTime"] = pd.to_datetime(df["startTime"], utc=True)
     df["publishTime"] = pd.to_datetime(df["publishTime"], utc=True)
 
-    # Drop records with null generation
-    null_count = df["generation"].isna().sum()
-    if null_count > 0:
-        logger.warning("Dropping %d WINDFOR records with null generation", null_count)
-    df = df.dropna(subset=["generation"])
+    df["generation"] = pd.to_numeric(df["generation"], errors="coerce")
+    finite_mask = np.isfinite(df["generation"].to_numpy(dtype=float))
+    quality.invalid_forecast_records = int((~finite_mask).sum())
+    if quality.invalid_forecast_records:
+        logger.warning(
+            "Dropping %d WINDFOR records with invalid generation",
+            quality.invalid_forecast_records,
+        )
+    df = df.loc[finite_mask].copy()
 
     # Track unique publish times
     quality.unique_publish_times = df["publishTime"].nunique()
     if not df.empty:
         quality.first_publish_time = df["publishTime"].min().to_pydatetime()
         quality.last_publish_time = df["publishTime"].max().to_pydatetime()
+
+    original_count = len(df)
+    df = df.sort_values("publishTime").drop_duplicates(
+        subset=["startTime", "publishTime"], keep="last"
+    )
+    quality.duplicate_forecasts_removed = original_count - len(df)
 
     # Rename for internal use
     df = df.rename(columns={
@@ -153,4 +170,3 @@ def normalize_forecasts(raw_records: list[dict], quality: DataQualityStats) -> p
         len(df), quality.unique_publish_times,
     )
     return df[["start_time", "publish_time", "generation_mw"]]
-

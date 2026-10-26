@@ -3,6 +3,8 @@ import { SelectedForecast } from '../types';
 import { Download, Search, Filter, AlertTriangle, CheckCircle, XCircle, ArrowUpDown } from 'lucide-react';
 import { getExportUrl } from '../api/client';
 
+type StatusFilter = 'all' | 'matched' | 'missing_forecast' | 'missing_actual';
+
 interface ForecastExplorerProps {
   records: SelectedForecast[];
   startDate: string;
@@ -21,7 +23,7 @@ export const ForecastExplorer: React.FC<ForecastExplorerProps> = ({
   isLoading,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'matched' | 'missing_forecast' | 'missing_actual'>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sortField, setSortField] = useState<keyof SelectedForecast>('target_time');
   const [sortAsc, setSortAsc] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -48,7 +50,9 @@ export const ForecastExplorer: React.FC<ForecastExplorerProps> = ({
       // Search term (date or numbers)
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
-        const dateMatch = r.target_time.toLowerCase().includes(term);
+        const dateMatch =
+          r.target_time.toLowerCase().includes(term) ||
+          formatDateTime(r.target_time).toLowerCase().includes(term);
         const fcMatch = r.forecast_generation_mw?.toString().includes(term);
         const acMatch = r.actual_generation_mw?.toString().includes(term);
         return dateMatch || fcMatch || acMatch;
@@ -81,11 +85,12 @@ export const ForecastExplorer: React.FC<ForecastExplorerProps> = ({
     }
   };
 
-  const formatDateTime = (ts: string | null) => {
+  function formatDateTime(ts: string | null) {
     if (!ts) return '—';
     try {
       const dt = new Date(ts);
       return dt.toLocaleDateString('en-GB', {
+        timeZone: 'UTC',
         day: '2-digit',
         month: 'short',
         year: 'numeric',
@@ -95,7 +100,7 @@ export const ForecastExplorer: React.FC<ForecastExplorerProps> = ({
     } catch {
       return ts;
     }
-  };
+  }
 
   const exportUrl = getExportUrl(startDate, endDate, decisionHour);
 
@@ -122,10 +127,11 @@ export const ForecastExplorer: React.FC<ForecastExplorerProps> = ({
         </div>
 
         {/* Filter Bar */}
-        <form onSubmit={handleApplyFilters} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-3 border-t border-slate-100 items-end text-xs">
+        <form onSubmit={handleApplyFilters} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 pt-3 border-t border-slate-100 items-end text-xs">
           <div>
-            <label className="block text-slate-600 font-medium mb-1">Start Date</label>
+            <label htmlFor="forecast-start-date" className="block text-slate-600 font-medium mb-1">Start Date</label>
             <input
+              id="forecast-start-date"
               type="date"
               value={inputStart}
               onChange={(e) => setInputStart(e.target.value)}
@@ -133,8 +139,9 @@ export const ForecastExplorer: React.FC<ForecastExplorerProps> = ({
             />
           </div>
           <div>
-            <label className="block text-slate-600 font-medium mb-1">End Date</label>
+            <label htmlFor="forecast-end-date" className="block text-slate-600 font-medium mb-1">End Date</label>
             <input
+              id="forecast-end-date"
               type="date"
               value={inputEnd}
               onChange={(e) => setInputEnd(e.target.value)}
@@ -142,8 +149,9 @@ export const ForecastExplorer: React.FC<ForecastExplorerProps> = ({
             />
           </div>
           <div>
-            <label className="block text-slate-600 font-medium mb-1">Decision Cutoff Hour (UTC)</label>
+            <label htmlFor="forecast-decision-hour" className="block text-slate-600 font-medium mb-1">Decision Cutoff Hour (UTC)</label>
             <select
+              id="forecast-decision-hour"
               value={inputHour}
               onChange={(e) => setInputHour(parseInt(e.target.value, 10))}
               className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-slate-800 bg-white focus:outline-hidden focus:ring-1 focus:ring-teal-500"
@@ -156,11 +164,20 @@ export const ForecastExplorer: React.FC<ForecastExplorerProps> = ({
             </select>
           </div>
           <div>
-            <label className="block text-slate-600 font-medium mb-1">Status Filter</label>
+            <label htmlFor="forecast-status-filter" className="block text-slate-600 font-medium mb-1">Status Filter</label>
             <select
+              id="forecast-status-filter"
               value={statusFilter}
               onChange={(e) => {
-                setStatusFilter(e.target.value as any);
+                const value = e.target.value;
+                if (
+                  value === 'all' ||
+                  value === 'matched' ||
+                  value === 'missing_forecast' ||
+                  value === 'missing_actual'
+                ) {
+                  setStatusFilter(value);
+                }
                 setCurrentPage(1);
               }}
               className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-slate-800 bg-white focus:outline-hidden focus:ring-1 focus:ring-teal-500"
@@ -170,6 +187,23 @@ export const ForecastExplorer: React.FC<ForecastExplorerProps> = ({
               <option value="missing_forecast">Missing Eligible Forecast</option>
               <option value="missing_actual">Missing Realized Actual</option>
             </select>
+          </div>
+          <div>
+            <label htmlFor="forecast-search" className="block text-slate-600 font-medium mb-1">Search records</label>
+            <div className="relative">
+              <Search aria-hidden="true" className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <input
+                id="forecast-search"
+                type="search"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Date or MW value"
+                className="w-full pl-8 pr-2.5 py-1.5 border border-slate-300 rounded text-slate-800 bg-white focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+              />
+            </div>
           </div>
           <div>
             <button
@@ -188,44 +222,44 @@ export const ForecastExplorer: React.FC<ForecastExplorerProps> = ({
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-medium">
             <tr>
-              <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-100" onClick={() => handleSort('target_time')}>
-                <div className="flex items-center space-x-1">
+              <th scope="col" aria-sort={sortField === 'target_time' ? (sortAsc ? 'ascending' : 'descending') : 'none'} className="py-2.5 px-3">
+                <button type="button" aria-label="Sort by target period (UTC)" onClick={() => handleSort('target_time')} className="flex items-center space-x-1 cursor-pointer hover:text-slate-900">
                   <span>Target Period (UTC)</span>
-                  <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                </div>
+                  <ArrowUpDown aria-hidden="true" className="w-3 h-3 text-slate-400" />
+                </button>
               </th>
-              <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-100" onClick={() => handleSort('forecast_generation_mw')}>
-                <div className="flex items-center space-x-1">
+              <th scope="col" aria-sort={sortField === 'forecast_generation_mw' ? (sortAsc ? 'ascending' : 'descending') : 'none'} className="py-2.5 px-3">
+                <button type="button" aria-label="Sort by selected forecast" onClick={() => handleSort('forecast_generation_mw')} className="flex items-center space-x-1 cursor-pointer hover:text-slate-900">
                   <span>Selected Forecast</span>
-                  <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                </div>
+                  <ArrowUpDown aria-hidden="true" className="w-3 h-3 text-slate-400" />
+                </button>
               </th>
-              <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-100" onClick={() => handleSort('forecast_publish_time')}>
-                <div className="flex items-center space-x-1">
+              <th scope="col" aria-sort={sortField === 'forecast_publish_time' ? (sortAsc ? 'ascending' : 'descending') : 'none'} className="py-2.5 px-3">
+                <button type="button" aria-label="Sort by publication time" onClick={() => handleSort('forecast_publish_time')} className="flex items-center space-x-1 cursor-pointer hover:text-slate-900">
                   <span>Published At</span>
-                  <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                </div>
+                  <ArrowUpDown aria-hidden="true" className="w-3 h-3 text-slate-400" />
+                </button>
               </th>
-              <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-100" onClick={() => handleSort('actual_generation_mw')}>
-                <div className="flex items-center space-x-1">
+              <th scope="col" aria-sort={sortField === 'actual_generation_mw' ? (sortAsc ? 'ascending' : 'descending') : 'none'} className="py-2.5 px-3">
+                <button type="button" aria-label="Sort by actual generation" onClick={() => handleSort('actual_generation_mw')} className="flex items-center space-x-1 cursor-pointer hover:text-slate-900">
                   <span>Actual Generation</span>
-                  <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                </div>
+                  <ArrowUpDown aria-hidden="true" className="w-3 h-3 text-slate-400" />
+                </button>
               </th>
-              <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-100" onClick={() => handleSort('error_mw')}>
-                <div className="flex items-center space-x-1">
+              <th scope="col" aria-sort={sortField === 'error_mw' ? (sortAsc ? 'ascending' : 'descending') : 'none'} className="py-2.5 px-3">
+                <button type="button" aria-label="Sort by error" onClick={() => handleSort('error_mw')} className="flex items-center space-x-1 cursor-pointer hover:text-slate-900">
                   <span>Error (F − A)</span>
-                  <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                </div>
+                  <ArrowUpDown aria-hidden="true" className="w-3 h-3 text-slate-400" />
+                </button>
               </th>
-              <th className="py-2.5 px-3 cursor-pointer hover:bg-slate-100" onClick={() => handleSort('absolute_error_mw')}>
-                <div className="flex items-center space-x-1">
+              <th scope="col" aria-sort={sortField === 'absolute_error_mw' ? (sortAsc ? 'ascending' : 'descending') : 'none'} className="py-2.5 px-3">
+                <button type="button" aria-label="Sort by absolute error" onClick={() => handleSort('absolute_error_mw')} className="flex items-center space-x-1 cursor-pointer hover:text-slate-900">
                   <span>Absolute Error</span>
-                  <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                </div>
+                  <ArrowUpDown aria-hidden="true" className="w-3 h-3 text-slate-400" />
+                </button>
               </th>
-              <th className="py-2.5 px-3">Percentage Error</th>
-              <th className="py-2.5 px-3">Availability</th>
+              <th scope="col" className="py-2.5 px-3">Percentage Error</th>
+              <th scope="col" className="py-2.5 px-3">Availability</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -300,7 +334,7 @@ export const ForecastExplorer: React.FC<ForecastExplorerProps> = ({
 
       {/* Pagination */}
       <div className="p-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-        <div>
+        <div aria-live="polite">
           Showing {paginatedRecords.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to{' '}
           {Math.min(currentPage * pageSize, sortedRecords.length)} of {sortedRecords.length} records
         </div>

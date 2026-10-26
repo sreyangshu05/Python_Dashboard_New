@@ -54,7 +54,12 @@ export const ErrorDistributionChart: React.FC<ErrorDistributionChartProps> = ({ 
             No error distribution data available.
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            role="img"
+            aria-label="Histogram of signed forecast error ranges in megawatts, showing the number of hours in each range."
+          >
             <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 25 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis
@@ -73,7 +78,7 @@ export const ErrorDistributionChart: React.FC<ErrorDistributionChartProps> = ({ 
                 width={55}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="count" fill="#0d9488" radius={[2, 2, 0, 0]} opacity={0.85} />
+              <Bar dataKey="count" fill="#0d9488" radius={[2, 2, 0, 0]} opacity={0.85} isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
         )}

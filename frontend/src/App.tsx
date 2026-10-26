@@ -35,6 +35,9 @@ export const App: React.FC = () => {
     setIsLoading(true);
     setDataSourceStatus('loading');
     setErrorMessage(null);
+    setOverview(null);
+    setForecastSeries(null);
+    setAccuracy(null);
 
     try {
       const [overviewData, seriesData, accuracyData] = await Promise.all([
@@ -47,10 +50,12 @@ export const App: React.FC = () => {
       setForecastSeries(seriesData);
       setAccuracy(accuracyData);
       setDataSourceStatus('connected');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch data:', err);
       setDataSourceStatus('error');
-      setErrorMessage(err.message || 'Error communicating with backend API.');
+      setErrorMessage(
+        err instanceof Error ? err.message : 'Error communicating with backend API.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -70,6 +75,14 @@ export const App: React.FC = () => {
     loadData(startDate, endDate, decisionHour);
   };
 
+  const activeTabTitle = {
+    overview: 'Overview',
+    explorer: 'Forecast Explorer',
+    accuracy: 'Accuracy Analysis',
+    quality: 'Data Ingestion Quality',
+    methodology: 'Methodology and Governance',
+  }[activeTab];
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <Header
@@ -85,9 +98,11 @@ export const App: React.FC = () => {
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 grow w-full">
         {/* Navigation Tabs */}
-        <div className="flex border-b border-slate-200 mb-6 overflow-x-auto space-x-1 sm:space-x-4">
+        <nav aria-label="Dashboard sections" className="flex border-b border-slate-200 mb-6 overflow-x-auto space-x-1 sm:space-x-4">
           <button
             onClick={() => setActiveTab('overview')}
+            aria-pressed={activeTab === 'overview'}
+            aria-controls="dashboard-content"
             className={`py-2.5 px-3 border-b-2 text-xs sm:text-sm font-medium flex items-center space-x-2 transition-colors whitespace-nowrap ${
               activeTab === 'overview'
                 ? 'border-teal-600 text-teal-700'
@@ -100,6 +115,8 @@ export const App: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('explorer')}
+            aria-pressed={activeTab === 'explorer'}
+            aria-controls="dashboard-content"
             className={`py-2.5 px-3 border-b-2 text-xs sm:text-sm font-medium flex items-center space-x-2 transition-colors whitespace-nowrap ${
               activeTab === 'explorer'
                 ? 'border-teal-600 text-teal-700'
@@ -112,6 +129,8 @@ export const App: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('accuracy')}
+            aria-pressed={activeTab === 'accuracy'}
+            aria-controls="dashboard-content"
             className={`py-2.5 px-3 border-b-2 text-xs sm:text-sm font-medium flex items-center space-x-2 transition-colors whitespace-nowrap ${
               activeTab === 'accuracy'
                 ? 'border-teal-600 text-teal-700'
@@ -124,6 +143,8 @@ export const App: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('quality')}
+            aria-pressed={activeTab === 'quality'}
+            aria-controls="dashboard-content"
             className={`py-2.5 px-3 border-b-2 text-xs sm:text-sm font-medium flex items-center space-x-2 transition-colors whitespace-nowrap ${
               activeTab === 'quality'
                 ? 'border-teal-600 text-teal-700'
@@ -136,6 +157,8 @@ export const App: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('methodology')}
+            aria-pressed={activeTab === 'methodology'}
+            aria-controls="dashboard-content"
             className={`py-2.5 px-3 border-b-2 text-xs sm:text-sm font-medium flex items-center space-x-2 transition-colors whitespace-nowrap ${
               activeTab === 'methodology'
                 ? 'border-teal-600 text-teal-700'
@@ -145,7 +168,7 @@ export const App: React.FC = () => {
             <BookOpen className="w-4 h-4" />
             <span>Methodology & Governance</span>
           </button>
-        </div>
+        </nav>
 
         {/* Global KPI Summary */}
         <KpiRow
@@ -154,6 +177,24 @@ export const App: React.FC = () => {
           isLoading={isLoading}
         />
 
+        {!isLoading &&
+          forecastSeries &&
+          !forecastSeries.records.some(
+            (record) => record.forecast_available || record.actual_available
+          ) && (
+            <div
+              role="status"
+              className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+            >
+              No forecast or actual observations were returned for this period.
+              Check the selected dates or refresh the Elexon data.
+            </div>
+          )}
+
+        <section
+          id="dashboard-content"
+          aria-label={`${activeTabTitle} content`}
+        >
         {/* Tab 1: Overview */}
         {activeTab === 'overview' && (
           <div>
@@ -224,6 +265,7 @@ export const App: React.FC = () => {
         {activeTab === 'methodology' && (
           <MethodologyPanel />
         )}
+        </section>
       </main>
 
       {/* Footer */}

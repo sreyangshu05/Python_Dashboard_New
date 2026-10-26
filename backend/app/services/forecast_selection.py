@@ -12,7 +12,7 @@ was being made.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
@@ -99,18 +99,20 @@ def build_evaluation_series(
                 ts = ts.to_pydatetime()
             actuals_lookup[ts] = float(row["generation_mw"])
 
-    # Get all unique target hours from forecasts that fall within the range
-    if not forecasts_df.empty:
-        target_mask = (forecasts_df["start_time"] >= start_time) & (forecasts_df["start_time"] < end_time)
-        target_hours = sorted(forecasts_df.loc[target_mask, "start_time"].unique())
+    if start_time.tzinfo is None:
+        start_time = start_time.replace(tzinfo=timezone.utc)
     else:
-        target_hours = []
+        start_time = start_time.astimezone(timezone.utc)
+    if end_time.tzinfo is None:
+        end_time = end_time.replace(tzinfo=timezone.utc)
+    else:
+        end_time = end_time.astimezone(timezone.utc)
 
-    # Also include hours from actuals that might not have forecasts
-    for ts in actuals_lookup:
-        if start_time <= ts < end_time and ts not in target_hours:
-            target_hours.append(ts)
-    target_hours = sorted(set(target_hours))
+    target_hours = []
+    target = start_time
+    while target < end_time:
+        target_hours.append(target)
+        target += timedelta(hours=1)
 
     for target in target_hours:
         if isinstance(target, pd.Timestamp):
@@ -135,7 +137,7 @@ def build_evaluation_series(
             error_mw = fc_gen - actual_gen
             abs_error_mw = abs(error_mw)
             if actual_gen != 0:
-                pct_error = (abs(error_mw) / actual_gen) * 100
+                pct_error = (abs(error_mw) / abs(actual_gen)) * 100
 
         results.append(SelectedForecast(
             target_time=target,
@@ -159,4 +161,3 @@ def build_evaluation_series(
         sum(1 for r in results if r.forecast_available and r.actual_available),
     )
     return results
-

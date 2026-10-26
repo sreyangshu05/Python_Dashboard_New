@@ -146,12 +146,12 @@ export const KpiRow: React.FC<KpiRowProps> = ({ metrics, latestForecast, isLoadi
             <div className="h-6 bg-slate-200 animate-pulse rounded w-20 my-0.5"></div>
           ) : (
             <span className={(metrics?.mbe_mw ?? 0) > 0 ? 'text-amber-700' : 'text-blue-700'}>
-              {(metrics?.mbe_mw ?? 0) > 0 ? '+' : ''}{formatMw(metrics?.mbe_mw)}
+              {metrics?.mbe_mw != null && metrics.mbe_mw > 0 ? '+' : ''}{formatMw(metrics?.mbe_mw)}
             </span>
           )}
         </div>
         <div className="text-[11px] text-slate-500 mt-1">
-          {(metrics?.mbe_mw ?? 0) > 0 ? 'Tendency to overforecast' : (metrics?.mbe_mw ?? 0) < 0 ? 'Tendency to underforecast' : 'Neutral average bias'}
+          {metrics?.mbe_mw == null ? 'No valid observations' : metrics.mbe_mw > 0 ? 'Tendency to overforecast' : metrics.mbe_mw < 0 ? 'Tendency to underforecast' : 'Neutral average bias'}
         </div>
       </div>
 

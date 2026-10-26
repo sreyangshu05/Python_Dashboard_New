@@ -71,16 +71,21 @@ export const DailyMetricsChart: React.FC<DailyMetricsChartProps> = ({ dailyMetri
             No daily metrics available.
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            role="img"
+            aria-label="Line chart of daily mean absolute error, root mean squared error, and mean bias error in megawatts over the evaluation period."
+          >
             <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#64748b' }} stroke="#cbd5e1" />
               <YAxis tick={{ fontSize: 11, fill: '#64748b' }} stroke="#cbd5e1" unit=" MW" width={65} />
               <Tooltip content={<CustomTooltip />} />
               <Legend verticalAlign="top" height={32} wrapperStyle={{ fontSize: '11px' }} />
-              <Line type="monotone" dataKey="mae" name="Daily MAE (MW)" stroke="#0d9488" strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="rmse" name="Daily RMSE (MW)" stroke="#6366f1" strokeWidth={2} strokeDasharray="4 4" dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="mbe" name="Daily MBE (MW)" stroke="#f59e0b" strokeWidth={1.5} dot={{ r: 2 }} />
+              <Line type="monotone" dataKey="mae" name="Daily MAE (MW)" stroke="#0d9488" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+              <Line type="monotone" dataKey="rmse" name="Daily RMSE (MW)" stroke="#6366f1" strokeWidth={2} strokeDasharray="4 4" dot={{ r: 3 }} isAnimationActive={false} />
+              <Line type="monotone" dataKey="mbe" name="Daily MBE (MW)" stroke="#f59e0b" strokeWidth={1.5} dot={{ r: 2 }} isAnimationActive={false} />
             </LineChart>
           </ResponsiveContainer>
         )}

@@ -2,6 +2,7 @@
 
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 
 
 @dataclass
@@ -39,6 +40,14 @@ class Settings:
         default_factory=lambda: int(os.getenv("CACHE_TTL_SECONDS", "900"))
     )
 
+    # Persistent snapshot of WINDFOR revisions retrieved from Elexon
+    WINDFOR_ARCHIVE_PATH: str = field(
+        default_factory=lambda: os.getenv(
+            "WINDFOR_ARCHIVE_PATH",
+            str(Path(__file__).resolve().parents[1] / "data" / "windfor.sqlite3"),
+        )
+    )
+
     # CORS
     CORS_ORIGINS: list[str] = field(
         default_factory=lambda: os.getenv(
@@ -52,4 +61,3 @@ class Settings:
 
 
 settings = Settings()
-

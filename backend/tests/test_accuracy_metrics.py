@@ -160,6 +160,29 @@ class TestAccuracyMetrics:
         metrics = calculate_accuracy_metrics(records, "2026-01-01", "2026-01-31", 9)
         assert metrics.valid_observations == 1
         assert metrics.mae_mw == 10.0
+        assert metrics.excluded_missing_actual == 1
+
+    def test_reports_missing_forecast_count(self):
+        records = [
+            _make_record(110, 100, target_hour=12),
+            _make_record(None, 100, target_hour=13, forecast_available=False),
+        ]
+
+        metrics = calculate_accuracy_metrics(records, "2026-01-01", "2026-01-31", 9)
+
+        assert metrics.excluded_missing_forecast == 1
+
+    def test_non_finite_values_are_excluded(self):
+        records = [
+            _make_record(float("nan"), 100, target_hour=12),
+            _make_record(90, 100, target_hour=13),
+        ]
+
+        metrics = calculate_accuracy_metrics(records, "2026-01-01", "2026-01-31", 9)
+
+        assert metrics.valid_observations == 1
+        assert metrics.excluded_non_finite == 1
+        assert metrics.mae_mw == 10.0
 
     def test_acceptance_d_signed_error(self):
         """Acceptance D: forecast=120, actual=100 → error = +20 MW."""
@@ -203,4 +226,3 @@ class TestErrorDistribution:
         assert len(dist) > 0
         total_count = sum(b["count"] for b in dist)
         assert total_count == len(records)
-

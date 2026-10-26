@@ -73,6 +73,9 @@ class AccuracyMetrics(BaseModel):
     error_std_mw: Optional[float] = Field(description="Standard Deviation of Error (MW)")
     total_observations: int = Field(description="Total matched observations")
     valid_observations: int = Field(description="Observations used for MAE/RMSE/MBE")
+    excluded_missing_forecast: int = Field(description="Observations without an eligible forecast")
+    excluded_missing_actual: int = Field(description="Observations without an actual value")
+    excluded_non_finite: int = Field(description="Observations with non-finite forecast or actual values")
     mape_eligible_observations: int = Field(description="Observations used for MAPE (non-zero actual)")
     mape_excluded_zero_actual: int = Field(description="Observations excluded from MAPE due to zero actual")
     evaluation_start: datetime
@@ -89,6 +92,9 @@ class DataQualityStats(BaseModel):
     periods_missing_forecast: int = 0
     duplicate_actuals_removed: int = 0
     duplicate_forecasts_removed: int = 0
+    invalid_actual_records: int = 0
+    invalid_forecast_records: int = 0
+    incomplete_actual_hours: int = 0
     forecasts_excluded_after_cutoff: int = 0
     first_target_time: Optional[datetime] = None
     last_target_time: Optional[datetime] = None
@@ -141,4 +147,3 @@ class HealthResponse(BaseModel):
     elexon_api_url: str
     evaluation_period: str
     timestamp: datetime
-

@@ -21,6 +21,9 @@ export interface AccuracyMetrics {
   error_std_mw: number | null;
   total_observations: number;
   valid_observations: number;
+  excluded_missing_forecast: number;
+  excluded_missing_actual: number;
+  excluded_non_finite: number;
   mape_eligible_observations: number;
   mape_excluded_zero_actual: number;
   evaluation_start: string;
@@ -36,6 +39,9 @@ export interface DataQualityStats {
   periods_missing_forecast: number;
   duplicate_actuals_removed: number;
   duplicate_forecasts_removed: number;
+  invalid_actual_records: number;
+  invalid_forecast_records: number;
+  incomplete_actual_hours: number;
   forecasts_excluded_after_cutoff: number;
   first_target_time: string | null;
   last_target_time: string | null;

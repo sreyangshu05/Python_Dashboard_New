@@ -10,8 +10,14 @@ services:
       - "8000:8000"
     environment:
       - ELEXON_BASE_URL=https://data.elexon.co.uk/bmrs/api/v1
+      - WINDFOR_ARCHIVE_PATH=/app/data/windfor.sqlite3
       - EVALUATION_START=2026-01-01
       - EVALUATION_END=2026-01-31
       - DEFAULT_DECISION_HOUR_UTC=9
       - CACHE_TTL_SECONDS=900
+    volumes:
+      - windscope-data:/app/data
     restart: unless-stopped
+
+volumes:
+  windscope-data:

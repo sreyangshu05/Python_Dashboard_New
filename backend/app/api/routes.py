@@ -5,7 +5,9 @@ from __future__ import annotations
 import csv
 import io
 import logging
-from datetime import datetime, timedelta, timezone
+import sqlite3
+from datetime import datetime, time, timedelta, timezone
+from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -28,6 +30,7 @@ from app.services.accuracy_metrics import (
 from app.services.data_normalization import normalize_actuals, normalize_forecasts
 from app.services.data_quality import compute_data_quality
 from app.services.elexon_client import ElexonClient, ElexonAPIError
+from app.services.forecast_archive import ForecastRevisionArchive
 from app.services.forecast_selection import build_evaluation_series
 
 logger = logging.getLogger(__name__)
@@ -36,10 +39,46 @@ router = APIRouter(prefix="/api")
 # Shared client and cache
 _client = ElexonClient()
 _cache: dict[str, tuple[datetime, object]] = {}
+_forecast_archive = ForecastRevisionArchive(settings.WINDFOR_ARCHIVE_PATH)
 
 
 def _cache_key(prefix: str, start: str, end: str, decision_hour: int) -> str:
     return f"{prefix}:{start}:{end}:{decision_hour}"
+
+
+def _resolve_filters(
+    start: str | None,
+    end: str | None,
+    decision_hour: int | None,
+) -> tuple[str, str, int]:
+    eval_start = start or settings.EVALUATION_START
+    eval_end = end or settings.EVALUATION_END
+    resolved_hour = (
+        decision_hour
+        if decision_hour is not None
+        else settings.DEFAULT_DECISION_HOUR_UTC
+    )
+
+    try:
+        start_date = datetime.strptime(eval_start, "%Y-%m-%d").date()
+        end_date = datetime.strptime(eval_end, "%Y-%m-%d").date()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="start and end must be valid dates in YYYY-MM-DD format",
+        ) from exc
+
+    if start_date.isoformat() != eval_start or end_date.isoformat() != eval_end:
+        raise HTTPException(
+            status_code=422,
+            detail="start and end must use zero-padded YYYY-MM-DD format",
+        )
+    if start_date > end_date:
+        raise HTTPException(status_code=422, detail="start must be on or before end")
+    if not 0 <= resolved_hour <= 23:
+        raise HTTPException(status_code=422, detail="decision_hour must be between 0 and 23")
+
+    return eval_start, eval_end, resolved_hour
 
 
 def _get_cached(key: str) -> object | None:
@@ -63,21 +102,7 @@ def _fetch_and_process(
     eval_end: str,
     decision_hour: int,
 ) -> tuple[list[SelectedForecast], DataQualityStats]:
-    """Fetch data from Elexon, normalize, select forecasts, and build evaluation series.
-
-    Decision-time policy:
-    For each day in the evaluation period, the decision time is set to
-    decision_hour UTC on that day. The decision is for the NEXT day's generation.
-    This means for a day-ahead decision made at e.g. 09:00 UTC on Jan 5,
-    we evaluate forecasts targeting Jan 6 that were published by 09:00 UTC on Jan 5.
-
-    To simplify for the first version: we use a single decision cutoff of
-    decision_hour UTC on the last day of the evaluation period. This evaluates
-    which forecasts were available for the target periods using the latest
-    decision point in the month.
-
-    A more thorough implementation would iterate each day and select per-day.
-    """
+    """Fetch, normalize, and evaluate each target day at its prior-day cutoff."""
     cache_key = _cache_key("eval", eval_start, eval_end, decision_hour)
     cached = _get_cached(cache_key)
     if cached is not None:
@@ -85,20 +110,18 @@ def _fetch_and_process(
 
     quality = DataQualityStats()
 
-    start_dt = datetime.fromisoformat(eval_start).replace(tzinfo=timezone.utc)
-    end_dt = datetime.fromisoformat(eval_end).replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
+    start_date = datetime.strptime(eval_start, "%Y-%m-%d").date()
+    end_date = datetime.strptime(eval_end, "%Y-%m-%d").date()
+    start_dt = datetime.combine(start_date, time.min, tzinfo=timezone.utc)
+    end_exclusive = datetime.combine(
+        end_date + timedelta(days=1), time.min, tzinfo=timezone.utc
+    )
 
-    # For actuals: we need FUELHH published during the evaluation period
-    # FUELHH publishes shortly after each settlement period
-    # So we need publishDateTime covering the eval period
     actual_publish_from = start_dt
-    actual_publish_to = end_dt + timedelta(days=1)
+    actual_publish_to = end_exclusive + timedelta(hours=2)
 
-    # For forecasts: we need WINDFOR published BEFORE or during the period
-    # Forecasts can be published days before their target period
-    # We need forecasts published from slightly before the eval start
-    forecast_publish_from = start_dt - timedelta(days=3)  # forecasts may be published 2-3 days ahead
-    forecast_publish_to = end_dt + timedelta(days=1)
+    forecast_publish_from = start_dt - timedelta(days=3)
+    forecast_publish_to = end_exclusive + timedelta(days=1)
 
     try:
         raw_actuals = _client.fetch_actual_wind_generation(actual_publish_from, actual_publish_to)
@@ -112,50 +135,57 @@ def _fetch_and_process(
         logger.error("Failed to fetch forecasts: %s", e)
         raise HTTPException(status_code=502, detail=f"Failed to fetch forecast data: {e}")
 
+    try:
+        _forecast_archive.store(raw_forecasts)
+        archived_forecasts = _forecast_archive.load(
+            forecast_publish_from, forecast_publish_to
+        )
+    except sqlite3.Error as e:
+        logger.exception("Failed to persist or read the WINDFOR revision archive")
+        raise HTTPException(
+            status_code=503,
+            detail="Failed to persist or read the local WINDFOR revision archive",
+        ) from e
+    raw_forecasts = archived_forecasts
+
     actuals_df = normalize_actuals(raw_actuals, quality)
     forecasts_df = normalize_forecasts(raw_forecasts, quality)
 
     quality.last_successful_fetch = _client.last_fetch_time
 
-    # Build per-day decision times and aggregate results
-    # For day-ahead: decision on day D at decision_hour covers targets on day D+1
-    # But for simplicity and to show all data in the eval period, we use a
-    # rolling approach: for each target hour, the decision time is
-    # decision_hour on the day before the target.
     all_records: list[SelectedForecast] = []
-
+    target_dates = {
+        start_date + timedelta(days=day_offset)
+        for day_offset in range((end_date - start_date).days + 1)
+    }
     if not forecasts_df.empty:
-        # Get unique target dates within the eval period
-        target_dates = set()
         for st in forecasts_df["start_time"]:
             dt = st.to_pydatetime() if hasattr(st, "to_pydatetime") else st
-            if start_dt <= dt <= end_dt:
+            if start_dt <= dt < end_exclusive:
                 target_dates.add(dt.date())
 
-        # Also add dates from actuals
-        if not actuals_df.empty:
-            for st in actuals_df["start_time_hourly"]:
-                dt = st.to_pydatetime() if hasattr(st, "to_pydatetime") else st
-                if start_dt <= dt <= end_dt:
-                    target_dates.add(dt.date())
+    if not actuals_df.empty:
+        for st in actuals_df["start_time_hourly"]:
+            dt = st.to_pydatetime() if hasattr(st, "to_pydatetime") else st
+            if start_dt <= dt < end_exclusive:
+                target_dates.add(dt.date())
 
-        # For each target date, the decision was made the day before at decision_hour
-        for target_date in sorted(target_dates):
-            decision_dt = datetime(
-                target_date.year, target_date.month, target_date.day,
-                decision_hour, 0, 0, tzinfo=timezone.utc
-            ) - timedelta(days=1)
+    for target_date in sorted(target_dates):
+        decision_dt = datetime(
+            target_date.year, target_date.month, target_date.day,
+            decision_hour, 0, 0, tzinfo=timezone.utc
+        ) - timedelta(days=1)
 
-            day_start = datetime(
-                target_date.year, target_date.month, target_date.day,
-                0, 0, 0, tzinfo=timezone.utc
-            )
-            day_end = day_start + timedelta(days=1)
+        day_start = datetime(
+            target_date.year, target_date.month, target_date.day,
+            0, 0, 0, tzinfo=timezone.utc
+        )
+        day_end = day_start + timedelta(days=1)
 
-            day_records = build_evaluation_series(
-                actuals_df, forecasts_df, decision_dt, day_start, day_end
-            )
-            all_records.extend(day_records)
+        day_records = build_evaluation_series(
+            actuals_df, forecasts_df, decision_dt, day_start, day_end
+        )
+        all_records.extend(day_records)
 
     quality = compute_data_quality(all_records, actuals_df, forecasts_df, quality)
 
@@ -166,9 +196,18 @@ def _fetch_and_process(
 
 @router.get("/health", response_model=HealthResponse)
 def health_check():
-    """Service health check."""
+    """Liveness check; this does not probe upstream Elexon readiness."""
+    configured_url = urlsplit(settings.ELEXON_BASE_URL)
+    hostname = configured_url.hostname or ""
+    if ":" in hostname:
+        hostname = f"[{hostname}]"
+    if configured_url.port is not None:
+        hostname = f"{hostname}:{configured_url.port}"
+    safe_api_url = urlunsplit(
+        (configured_url.scheme, hostname, configured_url.path, "", "")
+    )
     return HealthResponse(
-        elexon_api_url=settings.ELEXON_BASE_URL,
+        elexon_api_url=safe_api_url,
         evaluation_period=f"{settings.EVALUATION_START} to {settings.EVALUATION_END}",
         timestamp=datetime.now(timezone.utc),
     )
@@ -181,23 +220,8 @@ def get_overview(
     decision_hour: int = Query(default=None, description="Decision cutoff hour (UTC, 0-23)"),
 ):
     """Dashboard overview with latest forecast, metrics, and data quality."""
-    eval_start = start or settings.EVALUATION_START
-    eval_end = end or settings.EVALUATION_END
-    d_hour = decision_hour if decision_hour is not None else settings.DEFAULT_DECISION_HOUR_UTC
-
-    try:
-        records, quality = _fetch_and_process(eval_start, eval_end, d_hour)
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Error processing overview: %s", e)
-        return OverviewResponse(
-            evaluation_start=eval_start,
-            evaluation_end=eval_end,
-            decision_hour_utc=d_hour,
-            data_quality=DataQualityStats(),
-            error_message=str(e),
-        )
+    eval_start, eval_end, d_hour = _resolve_filters(start, end, decision_hour)
+    records, quality = _fetch_and_process(eval_start, eval_end, d_hour)
 
     # Find latest fully matched record
     latest_forecast = None
@@ -227,9 +251,7 @@ def get_forecasts(
     decision_hour: int = Query(default=None, description="Decision cutoff hour (UTC, 0-23)"),
 ):
     """Forecast vs actual time series for the evaluation period."""
-    eval_start = start or settings.EVALUATION_START
-    eval_end = end or settings.EVALUATION_END
-    d_hour = decision_hour if decision_hour is not None else settings.DEFAULT_DECISION_HOUR_UTC
+    eval_start, eval_end, d_hour = _resolve_filters(start, end, decision_hour)
 
     records, quality = _fetch_and_process(eval_start, eval_end, d_hour)
 
@@ -250,9 +272,7 @@ def get_accuracy(
     decision_hour: int = Query(default=None, description="Decision cutoff hour (UTC, 0-23)"),
 ):
     """Forecast accuracy analysis with metrics and distributions."""
-    eval_start = start or settings.EVALUATION_START
-    eval_end = end or settings.EVALUATION_END
-    d_hour = decision_hour if decision_hour is not None else settings.DEFAULT_DECISION_HOUR_UTC
+    eval_start, eval_end, d_hour = _resolve_filters(start, end, decision_hour)
 
     records, quality = _fetch_and_process(eval_start, eval_end, d_hour)
     metrics = calculate_accuracy_metrics(records, eval_start, eval_end, d_hour)
@@ -276,9 +296,7 @@ def get_data_quality(
     decision_hour: int = Query(default=None, description="Decision cutoff hour (UTC, 0-23)"),
 ):
     """Data quality statistics."""
-    eval_start = start or settings.EVALUATION_START
-    eval_end = end or settings.EVALUATION_END
-    d_hour = decision_hour if decision_hour is not None else settings.DEFAULT_DECISION_HOUR_UTC
+    eval_start, eval_end, d_hour = _resolve_filters(start, end, decision_hour)
 
     records, quality = _fetch_and_process(eval_start, eval_end, d_hour)
     return quality
@@ -295,9 +313,7 @@ def export_csv(
     Timestamps are in UTC (ISO 8601 format).
     Error convention: error = forecast - actual.
     """
-    eval_start = start or settings.EVALUATION_START
-    eval_end = end or settings.EVALUATION_END
-    d_hour = decision_hour if decision_hour is not None else settings.DEFAULT_DECISION_HOUR_UTC
+    eval_start, eval_end, d_hour = _resolve_filters(start, end, decision_hour)
 
     records, _ = _fetch_and_process(eval_start, eval_end, d_hour)
 
@@ -339,4 +355,3 @@ def export_csv(
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
-

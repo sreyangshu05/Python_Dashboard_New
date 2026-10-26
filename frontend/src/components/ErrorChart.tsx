@@ -22,8 +22,16 @@ export const ErrorChart: React.FC<ErrorChartProps> = ({ records, isLoading }) =>
     .filter((r) => r.error_mw !== null)
     .map((r) => {
       const dt = new Date(r.target_time);
-      const dateStr = dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-      const timeStr = dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      const dateStr = dt.toLocaleDateString('en-GB', {
+        timeZone: 'UTC',
+        day: 'numeric',
+        month: 'short',
+      });
+      const timeStr = dt.toLocaleTimeString('en-GB', {
+        timeZone: 'UTC',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
       return {
         displayTime: `${dateStr} ${timeStr}`,
         shortTime: `${dt.getDate()}/${dt.getMonth() + 1} ${timeStr}`,
@@ -41,7 +49,7 @@ export const ErrorChart: React.FC<ErrorChartProps> = ({ records, isLoading }) =>
       return (
         <div className="bg-slate-900 text-white p-3 rounded-lg shadow-lg text-xs space-y-1 border border-slate-700">
           <p className="font-semibold text-slate-200 border-b border-slate-800 pb-1">
-            {p.displayTime} GMT
+            {p.displayTime} UTC
           </p>
           <div className="flex justify-between items-center space-x-3">
             <span>Signed Error:</span>
@@ -89,7 +97,12 @@ export const ErrorChart: React.FC<ErrorChartProps> = ({ records, isLoading }) =>
             No matched errors to display.
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            role="img"
+            aria-label="Bar chart of hourly signed forecast errors in megawatts; positive values indicate overforecasting and negative values indicate underforecasting. Detailed values are available in Forecast Explorer."
+          >
             <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis
@@ -110,7 +123,7 @@ export const ErrorChart: React.FC<ErrorChartProps> = ({ records, isLoading }) =>
               />
               <Tooltip content={<CustomTooltip />} />
               <ReferenceLine y={0} stroke="#475569" strokeWidth={1.5} />
-              <Bar dataKey="error" name="Forecast Error (MW)">
+              <Bar dataKey="error" name="Forecast Error (MW)" isAnimationActive={false}>
                 {data.map((entry, index) => (
                   <Cell
                     key={`cell-${index}`}

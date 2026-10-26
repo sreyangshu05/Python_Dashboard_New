@@ -12,13 +12,15 @@ export const DataQualityPanel: React.FC<DataQualityPanelProps> = ({ stats, isLoa
     if (!ts) return '—';
     try {
       const dt = new Date(ts);
-      return dt.toLocaleDateString('en-GB', {
+      return dt.toLocaleString('en-GB', {
+        timeZone: 'Europe/London',
         day: '2-digit',
         month: 'short',
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
-      }) + ' GMT';
+        timeZoneName: 'short',
+      });
     } catch {
       return ts;
     }
@@ -74,9 +76,23 @@ export const DataQualityPanel: React.FC<DataQualityPanelProps> = ({ stats, isLoa
             {stats.unique_publish_times} publish cycles
           </div>
           <div className="text-xs text-slate-500 mt-0.5">
-            {stats.duplicate_actuals_removed} duplicate actuals removed
+            {stats.duplicate_actuals_removed} duplicate actuals; {stats.duplicate_forecasts_removed} duplicate forecast rows removed
           </div>
         </div>
+
+        {(stats.invalid_actual_records > 0 ||
+          stats.invalid_forecast_records > 0 ||
+          stats.incomplete_actual_hours > 0 ||
+          stats.periods_missing_actual > 0 ||
+          stats.periods_missing_forecast > 0) && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            Data-quality exclusions: {stats.invalid_actual_records} invalid actual rows,{' '}
+            {stats.invalid_forecast_records} invalid forecast rows,{' '}
+            {stats.incomplete_actual_hours} incomplete actual hours,{' '}
+            {stats.periods_missing_actual} missing actual hours, and{' '}
+            {stats.periods_missing_forecast} missing eligible forecasts.
+          </div>
+        )}
 
         <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
           <div className="flex items-center space-x-2 text-xs text-slate-500 mb-1">

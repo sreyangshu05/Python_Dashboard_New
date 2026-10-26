@@ -101,6 +101,34 @@ class TestNormalizeActuals:
         df = normalize_actuals(raw, quality)
         assert quality.duplicate_actuals_removed == 1
 
+    def test_rejects_incomplete_hours_and_invalid_generations(self):
+        raw = [
+            {
+                "dataset": "FUELHH",
+                "publishTime": "2026-03-29T01:30:00Z",
+                "startTime": "2026-03-29T01:00:00Z",
+                "settlementDate": "2026-03-29",
+                "settlementPeriod": 5,
+                "fuelType": "WIND",
+                "generation": 5000,
+            },
+            {
+                "dataset": "FUELHH",
+                "publishTime": "2026-03-29T02:00:00Z",
+                "startTime": "2026-03-29T01:30:00Z",
+                "settlementDate": "2026-03-29",
+                "settlementPeriod": 6,
+                "fuelType": "WIND",
+                "generation": float("nan"),
+            },
+        ]
+        quality = DataQualityStats()
+        df = normalize_actuals(raw, quality)
+
+        assert df.empty
+        assert quality.invalid_actual_records == 1
+        assert quality.incomplete_actual_hours == 1
+
 
 class TestNormalizeForecasts:
     def test_preserves_revisions(self):
@@ -131,3 +159,30 @@ class TestNormalizeForecasts:
         df = normalize_forecasts([], quality)
         assert len(df) == 0
 
+    def test_deduplicates_only_identical_publication_revisions(self):
+        raw = [
+            {
+                "dataset": "WINDFOR",
+                "publishTime": "2026-01-15T07:30:00Z",
+                "startTime": "2026-01-15T12:00:00Z",
+                "generation": 5000,
+            },
+            {
+                "dataset": "WINDFOR",
+                "publishTime": "2026-01-15T07:30:00Z",
+                "startTime": "2026-01-15T12:00:00Z",
+                "generation": 5000,
+            },
+            {
+                "dataset": "WINDFOR",
+                "publishTime": "2026-01-15T09:30:00Z",
+                "startTime": "2026-01-15T12:00:00Z",
+                "generation": 5100,
+            },
+        ]
+        quality = DataQualityStats()
+
+        df = normalize_forecasts(raw, quality)
+
+        assert len(df) == 2
+        assert quality.duplicate_forecasts_removed == 1

@@ -4,7 +4,8 @@ Tests use synthetic fixtures that are explicitly identified as test data.
 They are never presented as actual Elexon production data.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import pytest
@@ -108,6 +109,21 @@ class TestSelectForecastForTarget:
         assert found is True
         assert gen == 5000.0
 
+    def test_equivalent_timezones_compare_by_instant(self):
+        target_utc = _utc(2026, 1, 15, 12)
+        decision_utc = _utc(2026, 1, 15, 9)
+        target_local = target_utc.astimezone(ZoneInfo("Europe/London"))
+        published_local = _utc(2026, 1, 15, 8).astimezone(ZoneInfo("Europe/London"))
+        df = _make_forecasts_df([(target_local, published_local, 5000.0)])
+
+        generation, publish_time, found, _ = select_forecast_for_target(
+            target_utc, df, decision_utc
+        )
+
+        assert found
+        assert generation == 5000.0
+        assert publish_time == _utc(2026, 1, 15, 8)
+
 
 class TestBuildEvaluationSeries:
     """Test the evaluation series builder."""
@@ -129,8 +145,8 @@ class TestBuildEvaluationSeries:
             _utc(2026, 1, 15), _utc(2026, 1, 16),
         )
 
-        assert len(results) == 1
-        r = results[0]
+        assert len(results) == 24
+        r = next(record for record in results if record.target_time == _utc(2026, 1, 15, 12))
         assert r.error_mw == 20.0  # 120 - 100
         assert r.absolute_error_mw == 20.0
 
@@ -151,8 +167,11 @@ class TestBuildEvaluationSeries:
             _utc(2026, 1, 15), _utc(2026, 1, 16),
         )
 
-        assert len(results) == 1
-        assert results[0].error_mw == -10.0
+        assert len(results) == 24
+        target_record = next(
+            record for record in results if record.target_time == _utc(2026, 1, 15, 12)
+        )
+        assert target_record.error_mw == -10.0
 
     def test_missing_actual(self):
         """Handles missing actual gracefully."""
@@ -167,8 +186,8 @@ class TestBuildEvaluationSeries:
             _utc(2026, 1, 15), _utc(2026, 1, 16),
         )
 
-        assert len(results) == 1
-        r = results[0]
+        assert len(results) == 24
+        r = next(record for record in results if record.target_time == _utc(2026, 1, 15, 12))
         assert r.forecast_available is True
         assert r.actual_available is False
         assert r.error_mw is None
@@ -195,3 +214,45 @@ class TestBuildEvaluationSeries:
         assert r.forecast_available is False
         assert r.error_mw is None
 
+    def test_includes_every_hour_when_forecast_and_actual_are_missing(self):
+        results = build_evaluation_series(
+            pd.DataFrame(columns=["start_time_hourly", "generation_mw", "sp_count"]),
+            _make_forecasts_df([]),
+            _utc(2026, 1, 14, 9),
+            _utc(2026, 1, 15),
+            _utc(2026, 1, 16),
+        )
+
+        assert len(results) == 24
+        assert all(not record.forecast_available for record in results)
+        assert all(not record.actual_available for record in results)
+
+    @pytest.mark.parametrize(
+        ("start", "end", "expected_hours"),
+        [
+            (
+                datetime(2026, 3, 29, tzinfo=ZoneInfo("Europe/London")),
+                datetime(2026, 3, 30, tzinfo=ZoneInfo("Europe/London")),
+                23,
+            ),
+            (
+                datetime(2026, 10, 25, tzinfo=ZoneInfo("Europe/London")),
+                datetime(2026, 10, 26, tzinfo=ZoneInfo("Europe/London")),
+                25,
+            ),
+        ],
+    )
+    def test_dst_days_preserve_elapsed_utc_hours(self, start, end, expected_hours):
+        results = build_evaluation_series(
+            pd.DataFrame(columns=["start_time_hourly", "generation_mw", "sp_count"]),
+            _make_forecasts_df([]),
+            _utc(2026, 1, 1, 9),
+            start,
+            end,
+        )
+
+        assert len(results) == expected_hours
+        assert all(
+            current.target_time - previous.target_time == timedelta(hours=1)
+            for previous, current in zip(results, results[1:])
+        )
