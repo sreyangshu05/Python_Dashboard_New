@@ -17,7 +17,10 @@ future source retention or identical future responses. Every successfully
 retrieved WINDFOR revision is also recorded in a local SQLite archive, keyed by
 target and publication time. Later evaluations merge the current Elexon
 response with archived revisions before applying the decision cutoff. Docker
-Compose stores this database in the persistent `windscope-data` volume.
+Docker Compose stores this database in the persistent `windscope-data` volume.
+The optional free-tier Render configuration stores it under `/tmp`, which is
+ephemeral and does not provide durable revision retention across restarts,
+spin-downs, or redeploys.
 
 The archive preserves records from the first successful fetch of each
 publication window onward; it does not reconstruct revisions that were already

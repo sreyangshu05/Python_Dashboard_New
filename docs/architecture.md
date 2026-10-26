@@ -54,9 +54,10 @@ configures `/app/data/windfor.sqlite3` and persists it using the
 `windscope-data` named volume. Retaining/backing up that volume is an operator
 responsibility.
 
-The root `render.yaml` defines a backend-only native Python web service. It
-places the archive on a Render persistent disk mounted at `/var/data`; that
-disk is available to a single service instance. The Blueprint is not itself a
+The root `render.yaml` defines a backend-only native Python service on
+Render's free plan. It stores the SQLite archive under `/tmp`, which is
+ephemeral and may be cleared on restart, spin-down, or redeploy. This setup
+does not provide durable archive retention. The Blueprint is not itself a
 deployed service, and no public URL or production CORS origin has been
 verified.
 

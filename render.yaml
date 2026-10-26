@@ -2,7 +2,7 @@ services:
   - type: web
     name: windscope-api
     runtime: python
-    plan: starter
+    plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
@@ -11,7 +11,7 @@ services:
       - key: PYTHON_VERSION
         value: "3.14.8"
       - key: WINDFOR_ARCHIVE_PATH
-        value: /var/data/windfor.sqlite3
+        value: /tmp/windfor.sqlite3
       - key: ELEXON_BASE_URL
         value: https://data.elexon.co.uk/bmrs/api/v1
       - key: EVALUATION_START
@@ -26,7 +26,3 @@ services:
         value: "30"
       - key: ELEXON_MAX_RETRIES
         value: "3"
-    disk:
-      name: windscope-data
-      mountPath: /var/data
-      sizeGB: 1

@@ -125,7 +125,7 @@ windscope-uk/
 │   └── technical-walkthrough.md       # Architecture defense & review answers
 ├── Dockerfile                         # Lean multi-stage build container
 ├── docker-compose.yml                 # Single-command orchestration
-├── render.yaml                        # Render backend service and persistent disk
+├── render.yaml                        # Render free-tier backend service
 ├── .env.example                       # Environment configuration template
 ├── .gitignore
 ├── LICENSE                            # MIT License
@@ -313,12 +313,12 @@ that service root, starts Uvicorn on Render's injected `$PORT`, and uses
 `/api/health` as its health-check path. It pins Render's Python runtime to
 3.14.8, in the same Python 3.14 release line as the verified backend test run.
 
-The Blueprint configures a 1 GB persistent disk at `/var/data` and stores the
-SQLite archive at `/var/data/windfor.sqlite3`. Render persistent disks require
-a paid service plan; the Blueprint uses the `starter` plan. Review Render's
-current pricing before creating the service. The disk is attached to one
-service instance, so do not scale this SQLite-backed service to multiple
-instances.
+The Blueprint uses Render's `free` plan and stores its SQLite archive at
+`/tmp/windfor.sqlite3`. Free Render services do not provide persistent disks:
+the archive is ephemeral and can be lost on restart, spin-down, or redeploy.
+Historical revisions fetched by this instance may therefore need to be
+captured again after the archive is lost. This free configuration is suitable
+for a demo, not durable historical retention.
 
 To deploy, push this repository to GitHub, create a new Render Blueprint using
 that repository, review the proposed service and disk, and apply it. After
@@ -328,7 +328,9 @@ deployed, so no live runtime check or public URL is available yet. This
 backend-only deployment does not host the frontend. If the frontend is hosted
 separately, set `CORS_ORIGINS` in the Render service environment to its exact
 origin (scheme and hostname, without a path), then redeploy. No frontend
-origin or public service URL is prefilled here.
+origin or public service URL is prefilled here. Render free web services may
+spin down after inactivity, so the first request after idle time can take
+longer while the service starts.
 
 ### Docker
 
