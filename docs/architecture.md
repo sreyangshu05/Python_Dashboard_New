@@ -54,6 +54,12 @@ configures `/app/data/windfor.sqlite3` and persists it using the
 `windscope-data` named volume. Retaining/backing up that volume is an operator
 responsibility.
 
+The root `render.yaml` defines a backend-only native Python web service. It
+places the archive on a Render persistent disk mounted at `/var/data`; that
+disk is available to a single service instance. The Blueprint is not itself a
+deployed service, and no public URL or production CORS origin has been
+verified.
+
 `docker compose config --quiet` validates the Compose configuration. Docker
 image build/start was not run because the local Docker daemon was unavailable.
 See the [completion audit](./assignment-completion-audit.md) for verification

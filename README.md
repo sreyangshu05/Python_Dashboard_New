@@ -125,6 +125,7 @@ windscope-uk/
 │   └── technical-walkthrough.md       # Architecture defense & review answers
 ├── Dockerfile                         # Lean multi-stage build container
 ├── docker-compose.yml                 # Single-command orchestration
+├── render.yaml                        # Render backend service and persistent disk
 ├── .env.example                       # Environment configuration template
 ├── .gitignore
 ├── LICENSE                            # MIT License
@@ -304,13 +305,37 @@ npm run build
 
 ## 14. Deployment
 
+### Render backend
+
+The repository includes [`render.yaml`](render.yaml), a Render Blueprint for a
+Python web service rooted at `backend`. It installs `requirements.txt` from
+that service root, starts Uvicorn on Render's injected `$PORT`, and uses
+`/api/health` as its health-check path. It pins Render's Python runtime to
+3.14.8, in the same Python 3.14 release line as the verified backend test run.
+
+The Blueprint configures a 1 GB persistent disk at `/var/data` and stores the
+SQLite archive at `/var/data/windfor.sqlite3`. Render persistent disks require
+a paid service plan; the Blueprint uses the `starter` plan. Review Render's
+current pricing before creating the service. The disk is attached to one
+service instance, so do not scale this SQLite-backed service to multiple
+instances.
+
+To deploy, push this repository to GitHub, create a new Render Blueprint using
+that repository, review the proposed service and disk, and apply it. After
+deployment, verify `/api/health` and `/api/docs` at the Render-provided service
+URL. The Blueprint is configuration only; the service has not been created or
+deployed, so no live runtime check or public URL is available yet. This
+backend-only deployment does not host the frontend. If the frontend is hosted
+separately, set `CORS_ORIGINS` in the Render service environment to its exact
+origin (scheme and hostname, without a path), then redeploy. No frontend
+origin or public service URL is prefilled here.
+
+### Docker
+
 The Dockerfile defines a multi-stage build that compiles the React SPA and
 packages it with FastAPI; Compose maps port 8000 and mounts the `windscope-data`
 archive volume. Compose syntax validated, but an image build/start was not
-verified because the Docker daemon was unavailable. No Vercel or Heroku
-deployment configuration, public Git remote, or public application URL is
-available in this checkout. Do not treat the local address as a submission URL.
-A platform-specific public deployment remains outstanding.
+verified because the local Docker daemon was unavailable.
 
 ---
 
